@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+staged_files=$(
+    git diff --cached --name-only --diff-filter=ACMR |
+        grep -E '\.py$' || true
+)
+
+if [ -z "$staged_files" ]; then
+    exit 0
+fi
+
+echo "pre-commit: formatting staged Python files with Ruff"
+
+uv run ruff format $staged_files
+git add $staged_files

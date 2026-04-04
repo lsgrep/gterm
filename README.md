@@ -34,6 +34,12 @@ From source:
 uv tool install git+https://github.com/lsgrep/gterm
 ```
 
+For local development, enable the repo hook once:
+
+```bash
+make install-hooks
+```
+
 `llama-cpp-python` builds from source during install. Gemma 4 models with the `gemma4` architecture are currently forced onto CPU on macOS because of an upstream Metal crash in `llama.cpp`.
 
 Platform status: `gterm` is actively tested on macOS. Linux is expected to work, but it has not been validated nearly as thoroughly yet.

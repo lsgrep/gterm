@@ -1,4 +1,4 @@
-.PHONY: install run run-paranoid models download lint fmt check test \
+.PHONY: install install-hooks run run-paranoid models download lint fmt check test \
         build publish publish-test tool-install tool-uninstall \
         tag release clean
 
@@ -6,6 +6,10 @@
 
 install:
 	uv sync
+
+install-hooks:
+	git config core.hooksPath .githooks
+	@echo "Configured git hooks from .githooks/"
 
 # ── run ──────────────────────────────────────────────────────────────────────
 

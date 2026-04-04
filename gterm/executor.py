@@ -584,9 +584,7 @@ def _is_safe_http_read(args: list[str]) -> bool:
             "--remote-name",
         }:
             return False
-        if arg.startswith(
-            ("--data=", "--data-raw=", "--data-binary=", "--form=", "--output=")
-        ):
+        if arg.startswith(("--data=", "--data-raw=", "--data-binary=", "--form=", "--output=")):
             return False
 
     return method in {"GET", "HEAD"}
