@@ -1,118 +1,201 @@
 # gterm
 
-Natural language terminal powered by Gemma 4 via llama.cpp.
+Local natural-language terminal powered by Gemma 4 via `llama.cpp`.
 
-Type what you want — gterm translates it to shell commands, shows them for confirmation, then runs them. When a command fails, it automatically suggests a fix.
+Describe what you want in plain English. `gterm` turns that into shell commands, shows the exact command before execution, and keeps enough context to help with follow-up requests.
+
+## What it does
+
+- Runs fully local inference with Gemma 4 GGUF models
+- Picks a model that fits your hardware and downloads it on first use
+- Learns your projects and common directories from shell history, with explicit consent
+- Suggests a corrected command automatically when a command fails
+- Gives a short follow-up summary after non-trivial command output
+- Hands off full-terminal tools like `codex`, `aider`, `vim`, and `lazygit` without breaking their UI
 
 ## Install
 
-```bash
-# global install (recommended)
-uv tool install gterm
+From PyPI:
 
-# or with pip
+```bash
+uv tool install gterm
+```
+
+or:
+
+```bash
 pip install gterm
 ```
 
-> **Note:** `llama-cpp-python` is compiled from source on install.
-> Gemma 4 MoE models run on CPU only (Metal crash is an upstream llama.cpp bug — tracked in `_METAL_BROKEN_ARCHS`).
+From source:
+
+```bash
+uv tool install git+https://github.com/lsgrep/gterm
+```
+
+`llama-cpp-python` builds from source during install. Gemma 4 models with the `gemma4` architecture are currently forced onto CPU on macOS because of an upstream Metal crash in `llama.cpp`.
 
 ## Quickstart
 
 ```bash
-gterm                        # auto-downloads best model for your hardware
-gterm models                 # list all available models
-gterm download "26b q4"      # download a specific variant
-gterm use "e4b q8"           # switch default model
+gterm
 ```
 
-On first run, gterm asks for permission to read your shell history (`~/.zsh_history` / `~/.bash_history`) to learn your projects and frequent directories. This enables commands like:
+On first run, `gterm`:
 
+1. detects your hardware
+2. picks the best matching Gemma 4 model
+3. offers to download it if needed
+4. asks whether it may read your shell history for project context
+
+Useful commands:
+
+```bash
+gterm models            # list all bundled model variants
+gterm download "26b q4" # download a specific model
+gterm use "e4b q8"      # set a default model
 ```
-❯ open my overlay-web project in codex
+
+Once initialized, you can say things like:
+
+```text
+❯ show me memory usage
 ❯ go to the gterm project
-❯ start aider on the segue repo
+❯ open my overlay-web repo in codex
+❯ explain that error
 ```
 
-## The REPL
+## REPL behavior
 
-```
+Example prompt:
+
+```text
   ~/code/lsgrep/personal/gterm   main ●  gterm
 ❯ show me memory usage
 ```
 
-The prompt shows your current directory, git branch, and dirty status. After each command, gterm automatically provides a brief insight on the output.
+The prompt shows:
 
-### Built-in commands
+- current directory
+- git branch and dirty state
+- whether you are ahead or behind the remote
 
-| Command | Description |
-|---|---|
-| `/model` | Switch model interactively (with tab completion) |
-| `/models` | List all available models with download status |
-| `/init` | Rebuild context from shell history |
-| `/clear` | Clear conversation history |
-| `/history` | Show conversation turns |
-| `/cwd` | Print current directory |
-| `/help` | Show this list |
-| `exit` / Ctrl-D | Quit |
+For each request, the model responds in exactly one mode:
 
-### Response modes
+- Shell command: a fenced shell block that `gterm` asks you to confirm
+- `# ANSWER:`: a direct answer when you ask to explain or summarize output
+- `# CLARIFY:`: only when the request is genuinely ambiguous or destructive
 
-The model responds in one of three ways:
+Before execution, you get:
 
-- **Shell command** — a fenced code block, shown as a proposed command for confirmation
-- **`# ANSWER:`** — direct answer when you ask to explain or summarize output
-- **`# CLARIFY:`** — only when a request is genuinely ambiguous or destructive
-
-### Confirmation prompt
-
-```
+```text
   [y]es  [n]o  [e]dit
 ```
 
-Press `e` to open the proposed command in `$EDITOR` before running.
+`e` opens the generated command in `$EDITOR` so you can modify it before running.
 
-### Interactive tools
+After execution:
 
-Commands that need a full terminal (editors, AI coding assistants) are handed off with TTY passthrough — no output capture:
+- successful multi-line output gets a short automatic summary
+- failed commands trigger an automatic repair attempt
+- `cd` changes update the REPL working directory without spawning a subshell
 
+## Built-in commands
+
+| Command | Description |
+|---|---|
+| `/model` | Open the model picker |
+| `/model <name>` | Switch to a model by fuzzy name match |
+| `/models` | List available models with fit/download status |
+| `/init` | Rebuild project and directory context from shell history |
+| `/clear` | Clear conversation history |
+| `/history` | Show recent conversation turns |
+| `/cwd` | Print current directory |
+| `/help` | Show command help |
+| `exit` / `quit` / Ctrl-D | Quit |
+
+The REPL also supports tab completion for built-ins and model names after `/model`.
+
+## Project-aware navigation
+
+If you allow shell-history access, `gterm` extracts:
+
+- known projects
+- frequent directories
+
+That enables requests like:
+
+```text
+❯ go to the germ project
+❯ open segue in codex
+❯ start aider in my api repo
 ```
-❯ run codex in my overlay project   →  cd /path/to/overlay && codex
-❯ open vim                          →  vim  (full terminal)
-❯ start aider on main.py            →  aider main.py
-```
 
-Supported: `claude`, `aider`, `codex`, `gemini`, `vim`, `nvim`, `nano`, `lazygit`, `htop`, and more.
+Nothing is uploaded anywhere. The derived context is stored locally in `~/.config/gterm/state.json`.
+
+## Interactive tools
+
+`gterm` can launch full-terminal programs directly instead of trying to capture their output. That includes:
+
+- `claude`
+- `aider`
+- `codex`
+- `gemini`
+- `vim`
+- `nvim`
+- `nano`
+- `emacs`
+- `hx`
+- `micro`
+- `less`
+- `htop`
+- `btop`
+- `lazygit`
+- `tig`
+
+Typical handoff:
+
+```text
+❯ open my overlay project in codex
+→ cd /path/to/project
+→ codex
+```
 
 ## Models
 
-All Gemma 4 variants from [bartowski's GGUF repo](https://huggingface.co/bartowski) are included. gterm auto-selects the best fit for your hardware.
+`gterm` ships with a registry of Gemma 4 GGUF variants from Bartowski's Hugging Face repos and chooses the largest model that fits your machine.
 
-| Model | Params | Min RAM |
+Families currently included:
+
+| Model | Notes | Smallest bundled quant |
 |---|---|---|
-| Gemma 4 E2B | ~3B active | 3 GB |
-| Gemma 4 E4B | ~5B active | 5 GB |
-| Gemma 4 26B-A4B | ~4B active | 5 GB |
-| Gemma 4 31B | 31B dense | 20 GB |
+| Gemma 4 31B | dense model | `IQ1_M` |
+| Gemma 4 26B-A4B | MoE | `IQ2_XXS` |
+| Gemma 4 E4B | MoE | `IQ2_M` |
+| Gemma 4 E2B | MoE | `IQ2_M` |
 
-Each model is available in Q2_K through Q8_0 / BF16 quantizations.
+Selection is based on available RAM or Metal-accessible memory. Downloaded models live under `~/.config/gterm/models/`.
 
 ## Configuration
 
-Set via environment variables or `~/.config/gterm/config.toml`:
+Configuration can come from environment variables or `~/.config/gterm/config.toml`.
+
+Examples:
 
 ```bash
 export GTERM_MODEL_PATH=/path/to/custom.gguf
-export GTERM_N_CTX=4096          # context window (default: 4096)
-export GTERM_N_GPU_LAYERS=-1     # GPU layers (-1 = all, 0 = CPU only)
-export GTERM_N_THREADS=10        # inference threads (default: auto)
-export GTERM_N_BATCH=2048        # prompt batch size (default: 2048)
+export GTERM_N_CTX=4096
+export GTERM_N_GPU_LAYERS=-1
+export GTERM_N_THREADS=10
+export GTERM_N_BATCH=2048
 export GTERM_TEMPERATURE=0.2
-export GTERM_HF_TOKEN=hf_...     # for faster HuggingFace downloads
-export GTERM_PARANOID_MODE=true  # extra confirmation for destructive commands
+export GTERM_MAX_TOKENS=512
+export GTERM_HISTORY_LIMIT=20
+export GTERM_HF_TOKEN=hf_...
+export GTERM_PARANOID_MODE=true
 ```
 
-`~/.config/gterm/config.toml` example:
+Example `config.toml`:
 
 ```toml
 model_path = "/path/to/model.gguf"
@@ -121,22 +204,31 @@ temperature = 0.2
 paranoid_mode = false
 ```
 
-## Context & privacy
+`paranoid_mode` adds a stricter confirmation path for dangerous commands.
 
-Shell history is read only with your explicit consent (asked once on first run). The extracted project list and frequent directories are stored in `~/.config/gterm/state.json`. Nothing leaves your machine — all inference runs locally.
+## Context and privacy
 
-To revoke consent or clear the state:
+Shell history is read only after explicit consent. `gterm` currently looks at standard shell history files such as `~/.zsh_history` and `~/.bash_history` to infer project paths and frequently used directories.
+
+To revoke consent or reset the cached context:
 
 ```bash
-# disable history access
 echo '{"history_consent": false}' > ~/.config/gterm/state.json
+```
 
-# or rebuild from scratch
-rm ~/.config/gterm/state.json && gterm
+or:
+
+```bash
+rm ~/.config/gterm/state.json
+gterm
 ```
 
 ## Requirements
 
 - Python 3.11+
-- macOS 13+ or Linux
-- ~3GB+ free disk space for the smallest model
+- macOS or Linux
+- enough free disk and RAM for your chosen model
+
+## License
+
+Apache 2.0. See [LICENSE](LICENSE).
