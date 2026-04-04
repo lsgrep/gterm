@@ -10,8 +10,10 @@ _CONFIG_FILE = GTERM_CONFIG_DIR / "config.toml"
 
 class Settings(BaseSettings):
     model_path: Optional[Path] = None
-    n_ctx: int = 32768
+    n_ctx: int = 4096  # terminal commands are short; 4096 is plenty and much faster
     n_gpu_layers: int = -1
+    n_threads: Optional[int] = None  # None = auto-detect performance cores
+    n_batch: int = 2048  # larger batch = faster prompt processing (prefill)
     temperature: float = 0.2
     max_tokens: int = 512
     history_limit: int = 20
@@ -32,6 +34,7 @@ class Settings(BaseSettings):
         sources: list[PydanticBaseSettingsSource] = [init_settings, env_settings]
         if _CONFIG_FILE.exists():
             from pydantic_settings import TomlConfigSettingsSource
+
             sources.append(TomlConfigSettingsSource(settings_cls, toml_file=_CONFIG_FILE))
         return tuple(sources)
 

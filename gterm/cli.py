@@ -4,6 +4,7 @@ from pathlib import Path
 import click
 
 from gterm.config import Settings, load_settings, save_default_model
+from gterm.context_state import load_state, set_consent, update_state
 from gterm.hardware import detect_hardware
 from gterm.history import ConversationHistory
 from gterm.llm import LLMClient
@@ -22,10 +23,19 @@ from gterm.ui import UIRenderer
 
 
 @click.group(invoke_without_command=True)
-@click.option("--model", "model_path", type=click.Path(exists=True, path_type=Path), help="Path to a .gguf model file")
+@click.option(
+    "--model",
+    "model_path",
+    type=click.Path(exists=True, path_type=Path),
+    help="Path to a .gguf model file",
+)
 @click.option("--ctx", "n_ctx", type=int, default=None, help="Context window size (default: 8192)")
-@click.option("--gpu-layers", "n_gpu_layers", type=int, default=None, help="GPU layers (-1=all, 0=CPU only)")
-@click.option("--paranoid", is_flag=True, default=False, help="Extra confirmation for dangerous commands")
+@click.option(
+    "--gpu-layers", "n_gpu_layers", type=int, default=None, help="GPU layers (-1=all, 0=CPU only)"
+)
+@click.option(
+    "--paranoid", is_flag=True, default=False, help="Extra confirmation for dangerous commands"
+)
 @click.pass_context
 def main(
     ctx: click.Context,
@@ -56,6 +66,8 @@ def main(
         ui.show_error(str(e))
         sys.exit(1)
 
+    ctx = _load_context(ui)
+
     ui.show_info("Loading model…")
     try:
         llm = LLMClient(settings)
@@ -70,7 +82,7 @@ def main(
         history=ConversationHistory(limit=settings.history_limit),
         shell=shell,
         ui=ui,
-        prompt_builder=PromptBuilder(shell),
+        prompt_builder=PromptBuilder(shell, context=ctx),
         hw_spec=hw,
     )
     repl.run()
@@ -156,12 +168,13 @@ def cmd_use(model_name: str) -> None:
     path = get_local_model_path(variant)
     save_default_model(path)
     ui.show_success(f"Default model set to [bold]{variant.name} ({variant.quant})[/]")
-    ui.show_info(f"Saved to ~/.config/gterm/config.toml — run `gterm` to start.")
+    ui.show_info("Saved to ~/.config/gterm/config.toml — run `gterm` to start.")
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _resolve_model(explicit_path: Path | None, ui: UIRenderer, hw) -> Path | None:
     """
@@ -194,7 +207,9 @@ def _resolve_model(explicit_path: Path | None, ui: UIRenderer, hw) -> Path | Non
     # Nothing available — offer to download
     ui.show_info(f"Detected hardware: {hw}")
     recommended = recommend_model(hw)
-    ui.show_info(f"No model found. Recommended: [bold]{recommended.name}[/] ({recommended.size_gb:.1f}GB)")
+    ui.show_info(
+        f"No model found. Recommended: [bold]{recommended.name}[/] ({recommended.size_gb:.1f}GB)"
+    )
 
     if not ui.confirm_download(recommended.name, recommended.size_gb):
         ui.show_cancelled()
@@ -207,6 +222,40 @@ def _resolve_model(explicit_path: Path | None, ui: UIRenderer, hw) -> Path | Non
     except Exception as e:
         ui.show_error(f"Download failed: {e}")
         return None
+
+
+def _load_context(ui: UIRenderer):  # type: ignore[return]
+    """Ask for consent on first run, then update and return context state."""
+    from gterm.context_state import ContextState
+
+    state = load_state()
+
+    if state.history_consent is None:
+        ui.show_info(
+            "gterm can read your shell history (~/.zsh_history / ~/.bash_history) to learn\n"
+            "  your projects and frequent directories, enabling commands like\n"
+            "  'open my overlay-web project' or 'go to my rust repo'.\n"
+            "  No data leaves your machine. You can revoke this at any time by editing\n"
+            "  ~/.config/gterm/state.json and setting history_consent to false."
+        )
+        ui.console_print("[dim]  Allow gterm to read shell history? \\[y]es / \\[n]o[/]  ", end="")
+        answer = input().strip().lower()
+        granted = answer in ("y", "yes")
+        set_consent(granted)
+        if not granted:
+            ui.show_info("Shell history access declined — context features disabled.")
+            return ContextState(history_consent=False)
+
+    state = load_state()
+    if not state.history_consent:
+        return state
+
+    try:
+        ctx = update_state()
+        ui.show_info(f"Context updated: {len(ctx.projects)} known project(s).")
+        return ctx
+    except Exception:
+        return state
 
 
 def _find_model_by_name(name: str) -> ModelVariant | None:

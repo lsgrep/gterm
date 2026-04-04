@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -8,6 +9,34 @@ from gterm.ui import UIRenderer
 
 _FENCE_RE = re.compile(r"```(?:bash|sh|zsh|shell)?\s*\n(.*?)```", re.DOTALL)
 _CLARIFY_RE = re.compile(r"^\s*#\s*CLARIFY:\s*(.+)", re.MULTILINE)
+_ANSWER_RE = re.compile(r"^\s*#\s*ANSWER:\s*(.+)", re.MULTILINE | re.DOTALL)
+
+# Commands that need a full TTY — captured subprocess would corrupt their UI.
+# These are handed off directly with stdin/stdout/stderr inherited from the terminal.
+_TTY_COMMANDS = {
+    # AI coding assistants
+    "claude",
+    "aider",
+    "codex",
+    "gemini",
+    "copilot",
+    # editors
+    "vim",
+    "vi",
+    "nvim",
+    "nano",
+    "emacs",
+    "hx",
+    "micro",
+    # other interactive TUIs
+    "less",
+    "more",
+    "man",
+    "htop",
+    "btop",
+    "lazygit",
+    "tig",
+}
 
 _DANGER_PATTERNS = [
     re.compile(r"\brm\s+(-\w*f\w*\s+)?/"),
@@ -18,22 +47,38 @@ _DANGER_PATTERNS = [
 ]
 
 
-def extract_commands(llm_output: str) -> list[str] | None:
-    if is_clarify_response(llm_output)[0]:
-        return None
-
-    match = _FENCE_RE.search(llm_output)
-    raw = match.group(1).strip() if match else llm_output.strip()
-
-    lines = [l.strip() for l in raw.splitlines() if l.strip() and not l.strip().startswith("#")]
-    return lines if lines else None
-
-
 def is_clarify_response(llm_output: str) -> tuple[bool, str]:
     match = _CLARIFY_RE.search(llm_output)
     if match:
         return True, match.group(1).strip()
     return False, ""
+
+
+def is_answer_response(llm_output: str) -> tuple[bool, str]:
+    match = _ANSWER_RE.search(llm_output)
+    if match:
+        return True, match.group(1).strip()
+    return False, ""
+
+
+def extract_commands(llm_output: str) -> list[str] | None:
+    if is_clarify_response(llm_output)[0] or is_answer_response(llm_output)[0]:
+        return None
+
+    match = _FENCE_RE.search(llm_output)
+    raw = match.group(1).strip() if match else llm_output.strip()
+
+    lines = [ln.strip() for ln in raw.splitlines() if ln.strip() and not ln.strip().startswith("#")]
+    return lines if lines else None
+
+
+def needs_tty(commands: list[str]) -> bool:
+    """Return True if any command in the list needs a full TTY (no output capture)."""
+    for cmd in commands:
+        first_word = cmd.strip().split()[0].lstrip("./") if cmd.strip() else ""
+        if first_word in _TTY_COMMANDS:
+            return True
+    return False
 
 
 def is_cd_command(command: str) -> tuple[bool, str]:
@@ -54,16 +99,18 @@ def confirm_and_run(
     ui: UIRenderer,
     cwd: Path,
     paranoid_mode: bool = False,
-) -> tuple[bool, str, Path]:
+) -> tuple[bool, str, Path, int]:
     while True:
         ui.show_command_panel(commands)
 
         if paranoid_mode and is_dangerous(commands):
-            ui.show_error("Dangerous command detected. Type the command verbatim to confirm, or 'n' to cancel.")
+            ui.show_error(
+                "Dangerous command detected. Type the command verbatim to confirm, or 'n' to cancel."
+            )
             typed = input("> ").strip()
             if typed != " && ".join(commands):
                 ui.show_cancelled()
-                return False, "", cwd
+                return False, "", cwd, 0
 
         choice = ui.show_confirm_prompt()
 
@@ -71,7 +118,7 @@ def confirm_and_run(
             return _execute(commands, shell, ui, cwd)
         elif choice in ("n", "no"):
             ui.show_cancelled()
-            return False, "", cwd
+            return False, "", cwd, 0
         elif choice in ("e", "edit"):
             commands = _edit_commands(commands)
         else:
@@ -83,18 +130,33 @@ def _execute(
     shell: ShellAdapter,
     ui: UIRenderer,
     cwd: Path,
-) -> tuple[bool, str, Path]:
+) -> tuple[bool, str, Path, int]:
     if len(commands) == 1:
         is_cd, target = is_cd_command(commands[0])
         if is_cd:
             new_cwd = _resolve_cd(target, cwd)
             ui.show_info(f"cwd → {new_cwd}")
-            return True, f"Changed directory to {new_cwd}", new_cwd
+            return True, f"Changed directory to {new_cwd}", new_cwd, 0
+
+    if needs_tty(commands):
+        # Peel off any leading `cd` commands to get the effective working directory,
+        # then hand off terminal control for the remaining TTY command(s).
+        effective_cwd = cwd
+        remaining = []
+        for cmd in commands:
+            is_cd, target = is_cd_command(cmd)
+            if is_cd and not remaining:
+                effective_cwd = _resolve_cd(target, effective_cwd)
+            else:
+                remaining.append(cmd)
+        launch = " && ".join(remaining) if remaining else commands[-1]
+        result = subprocess.run(launch, shell=True, cwd=effective_cwd)
+        return True, "", effective_cwd, result.returncode
 
     exit_code, stdout, stderr = shell.run(commands, cwd=cwd)
     output = stdout + (f"\n[stderr]\n{stderr}" if stderr.strip() else "")
     ui.show_output(output, exit_code)
-    return True, output, cwd
+    return True, output, cwd, exit_code
 
 
 def _resolve_cd(target: str, cwd: Path) -> Path:
@@ -119,5 +181,7 @@ def _edit_commands(commands: list[str]) -> list[str]:
         edited = f.read()
     os.unlink(tmp_path)
 
-    lines = [l.strip() for l in edited.splitlines() if l.strip() and not l.strip().startswith("#")]
+    lines = [
+        ln.strip() for ln in edited.splitlines() if ln.strip() and not ln.strip().startswith("#")
+    ]
     return lines if lines else commands

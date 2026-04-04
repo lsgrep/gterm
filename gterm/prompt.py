@@ -1,63 +1,89 @@
+from __future__ import annotations
+
 from datetime import date
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from gterm.platform_shell import ShellAdapter
 
+if TYPE_CHECKING:
+    from gterm.context_state import ContextState
+
 SYSTEM_TEMPLATE = """\
-You are a shell command expert running on {os_name}. \
-Your job is to help the user by either generating shell commands or \
-directly answering questions about previous command output.
+You are a shell assistant on {os_name}. Translate natural language into shell commands \
+or answer questions about previous output.
 
-Response modes — pick EXACTLY ONE per reply:
+Pick EXACTLY ONE response mode:
 
-MODE A — Shell command:
-Respond with a single fenced code block:
+A) Shell command — a fenced code block, nothing else outside it:
 ```{shell_hint}
-<command(s)>
+<command>
 ```
-Use this when the user wants to run something new, filter/process/sort output, \
-or perform any shell action. If the user's follow-up refers to previous output \
-(e.g. "sort that", "filter by cpu", "show only root processes"), emit a \
-self-contained pipeline that re-runs or processes the data accordingly. \
-Do NOT include any prose outside the code block.
 
-MODE B — Direct answer:
-Respond with a single line: `# ANSWER: <your response>`
-Use this when the user asks you to explain, summarize, or interpret output \
-that is already visible in the conversation history. No code block needed.
-Examples: "what does this mean?", "give me a summary", "which process uses most memory?", \
-"explain the output", "how many processes are there?"
+B) Direct answer — one line when the user asks to explain or summarize prior output:
+# ANSWER: <text>
 
-MODE C — Clarification needed:
-Respond with a single line: `# CLARIFY: <what you need>`
-Use this ONLY when the request is genuinely ambiguous with NO prior context, \
-or when the command would be irreversibly destructive \
-(e.g. deleting files without a path, formatting disks, killing all processes). \
-Do NOT clarify if you can infer intent from the conversation history.
+C) Clarification — only when the request is truly ambiguous or irreversibly destructive:
+# CLARIFY: <question>
+Do NOT clarify when intent is clear from context or history.
 
-Rules:
-- Never mix modes in a single reply.
-- Prefer safe flags (e.g. `rm -i`, `--dry-run`).
-- For `cd` changes, use `cd <dir>` as the sole command.
-- When the user refers to "that", "this output", "it", "those" — use the \
-  previous command output already in the conversation.
+Output quality rules:
+- Prefer commands that produce clean, readable output. \
+Pipe through `column -t`, `awk`, or `grep` to trim noise when output would be large.
+- For "show X usage / stats" queries, use the dedicated tool (see platform notes) \
+rather than raw `ps aux` which produces walls of text.
+- Avoid interactive commands (no bare `top`, `htop`, `vim` without flags). \
+Use snapshot variants instead (e.g. `top -l 1 -s 0`).
+- Use `-h` (human-readable sizes) whenever available.
+- Prefer safe flags (`rm -i`, `--dry-run`).
+- `cd` is always its own command. To open a tool in a project, put `cd <path>` \
+  on one line and the tool on the next line inside the same code block.
+- When user says "that", "it", "those" — reference the previous command output from history.
+- For interactive TUI tools (editors, AI assistants), generate the bare launch command — \
+  do NOT pipe or redirect, the tool needs a full terminal.
+
+Project navigation:
+- "open/go to/switch to <project>" → `cd <path>`
+- "open <project> in <editor/tool>" or "start <tool> at/in/for <project>" → \
+  two commands on separate lines: `cd <path>` then `<tool>`
+- Match project names loosely — "overlay" matches "overlay-web", "germ" matches the germ project.
+- Always resolve the full path from "Known projects" below when a project name is mentioned.
+
+AI coding tools (these need a full terminal — never pipe or redirect them):
+- Claude Code: `claude`
+- Aider:       `aider [file ...]`
+- Codex:       `codex`  ← no path argument; cd first, then run codex
+- Gemini CLI:  `gemini`
+- Cursor:      `cursor [path]`  (GUI, detaches)
+- VS Code:     `code [path]`
 
 Current working directory: {cwd}
 Operating system: {os_name}
 Shell: {shell}
 Today's date: {date}
-"""
+
+Platform notes:
+{command_notes}
+{context_section}"""
 
 
 class PromptBuilder:
-    def __init__(self, shell: ShellAdapter) -> None:
+    def __init__(self, shell: ShellAdapter, context: ContextState | None = None) -> None:
         self._shell = shell
+        self.context = context  # mutable — callers may replace it
 
     def build(self, cwd: Path) -> str:
+        context_section = ""
+        if self.context:
+            ctx_text = self.context.format_for_prompt()
+            if ctx_text:
+                context_section = f"\n{ctx_text}"
         return SYSTEM_TEMPLATE.format(
             os_name=self._shell.os_name,
             shell=self._shell.name,
             shell_hint=self._shell.shell_hint,
+            command_notes=self._shell.command_notes,
             cwd=cwd,
             date=date.today().isoformat(),
+            context_section=context_section,
         )
