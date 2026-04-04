@@ -12,6 +12,7 @@ from rich.table import Table
 from rich.text import Text
 
 if TYPE_CHECKING:
+    from gterm.executor import CommandPreview
     from gterm.git_info import GitStatus
 
 console = Console()
@@ -31,16 +32,16 @@ class UIRenderer:
         path_str = _abbrev_path(cwd)
 
         line = Text()
-        line.append("  ", style="")
+        line.append("╭─ ", style="dim")
         line.append(path_str, style="bold cyan")
 
         if git:
             line.append("  ", style="")
             if git.dirty:
-                line.append(f" {git.branch}", style="bold yellow")
+                line.append(f"{git.branch}", style="bold yellow")
                 line.append(" ●", style="yellow")
             else:
-                line.append(f" {git.branch}", style="bold green")
+                line.append(f"{git.branch}", style="bold green")
                 line.append(" ✓", style="green")
             if git.ahead:
                 line.append(f" ↑{git.ahead}", style="dim cyan")
@@ -50,6 +51,9 @@ class UIRenderer:
         line.append("  ", style="")
         line.append("gterm", style="dim green")
         console.print(line)
+
+    def prompt_input(self) -> str:
+        return console.input("[dim]╰─[/] [bold green]❯ [/] ").strip()
 
     def show_welcome(self, model_name: str, hw_summary: str, metal_disabled: bool = False) -> None:
         lines = [
@@ -78,10 +82,26 @@ class UIRenderer:
             )
         )
 
-    def show_command_panel(self, commands: list[str]) -> None:
+    def show_command_panel(self, commands: list[str], preview: "CommandPreview | None" = None) -> None:
         code = "\n".join(commands)
         syntax = Syntax(code, "bash", theme="monokai", word_wrap=True)
         console.print(Panel(syntax, title="[yellow]proposed command[/]", border_style="yellow"))
+        if not preview or not (preview.info or preview.warnings):
+            return
+
+        lines: list[str] = []
+        for warning in preview.warnings:
+            lines.append(f"[red]warning:[/] {warning}")
+        for info in preview.info:
+            lines.append(f"[cyan]info:[/] {info}")
+
+        console.print(
+            Panel(
+                "\n".join(lines),
+                title="[cyan]execution preview[/]",
+                border_style="cyan",
+            )
+        )
 
     def show_confirm_prompt(self) -> str:
         console.print("[dim]  \\[y]es  \\[n]o  \\[e]dit[/]  ", end="")
@@ -121,16 +141,24 @@ class UIRenderer:
     def show_success(self, message: str) -> None:
         console.print(f"[green]{message}[/]")
 
-    def start_streaming(self) -> Live:
+    def start_status(self, message: str) -> Live:
         return Live(
-            Spinner("dots", text=" thinking…", style="dim"),
+            self._spinner(message),
             console=console,
-            refresh_per_second=15,
-            transient=True,  # erase spinner/stream when done — only the result panel stays
+            refresh_per_second=20,
+            transient=True,
         )
 
+    def start_streaming(self) -> Live:
+        return self.start_status("thinking...")
+
     def update_stream(self, live: Live, buffer: str) -> None:
-        live.update(Text(buffer, style="dim"))
+        preview = _single_line_preview(buffer)
+        status = " thinking..." if not preview else f" thinking... {preview}"
+        live.update(self._spinner(status))
+
+    def _spinner(self, message: str) -> Spinner:
+        return Spinner("dots", text=f" {message}", style="cyan")
 
     def show_followup(self, message: str) -> None:
         console.print(Panel(message, title="[dim]insight[/]", border_style="dim"))
@@ -216,3 +244,10 @@ class UIRenderer:
         )
         console.print("[dim]  \\[y]es  \\[n]o[/]  ", end="")
         return input().strip().lower() in ("y", "yes", "")
+
+
+def _single_line_preview(text: str, limit: int = 70) -> str:
+    flattened = " ".join(text.split())
+    if not flattened:
+        return ""
+    return flattened if len(flattened) <= limit else flattened[: limit - 1] + "…"

@@ -68,9 +68,9 @@ def main(
 
     ctx = _load_context(ui)
 
-    ui.show_info("Loading model…")
     try:
-        llm = LLMClient(settings)
+        with ui.start_status("loading model..."):
+            llm = LLMClient(settings)
     except Exception as e:
         ui.show_error(f"Failed to load model: {e}")
         sys.exit(1)

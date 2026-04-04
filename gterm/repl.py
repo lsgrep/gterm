@@ -53,7 +53,7 @@ class GtermREPL:
                 git = get_git_status(self._cwd)
                 print()
                 self._ui.print_prompt_line(self._cwd, git)
-                user_input = input("❯ ").strip()
+                user_input = self._ui.prompt_input()
             except KeyboardInterrupt:
                 # Ctrl+C at the prompt — clear the line and loop
                 print()
@@ -311,9 +311,9 @@ class GtermREPL:
                 return
 
         path = get_local_model_path(variant)
-        self._ui.show_info(f"Loading {variant.name} ({variant.quant})…")
         try:
-            self._llm.reload(path)
+            with self._ui.start_status(f"loading {variant.name} ({variant.quant})..."):
+                self._llm.reload(path)
         except Exception as e:
             self._ui.show_error(f"Failed to load model: {e}")
             return

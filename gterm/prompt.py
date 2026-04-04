@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from gterm.platform_shell import ShellAdapter
+from gterm.project_context import build_project_context
 
 if TYPE_CHECKING:
     from gterm.context_state import ContextState
@@ -41,6 +42,8 @@ Use snapshot variants instead (e.g. `top -l 1 -s 0`).
 - When user says "that", "it", "those" — reference the previous command output from history.
 - For interactive TUI tools (editors, AI assistants), generate the bare launch command — \
   do NOT pipe or redirect, the tool needs a full terminal.
+- When the current project section below lists scripts, targets, or build metadata, prefer \
+  those project-native commands over generic guesses.
 
 Project navigation:
 - "open/go to/switch to <project>" → `cd <path>`
@@ -64,6 +67,7 @@ Today's date: {date}
 
 Platform notes:
 {command_notes}
+{project_section}
 {context_section}"""
 
 
@@ -78,6 +82,8 @@ class PromptBuilder:
             ctx_text = self.context.format_for_prompt()
             if ctx_text:
                 context_section = f"\n{ctx_text}"
+        project_text = build_project_context(cwd)
+        project_section = f"\n{project_text}" if project_text else ""
         return SYSTEM_TEMPLATE.format(
             os_name=self._shell.os_name,
             shell=self._shell.name,
@@ -85,5 +91,6 @@ class PromptBuilder:
             command_notes=self._shell.command_notes,
             cwd=cwd,
             date=date.today().isoformat(),
+            project_section=project_section,
             context_section=context_section,
         )
