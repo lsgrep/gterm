@@ -3,14 +3,14 @@ name = "gterm"
 dynamic = ["version"]
 description = "Natural language terminal powered by Gemma 4 via llama.cpp"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
 keywords = ["llm", "terminal", "gemma", "cli", "llama-cpp"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3.11",
@@ -44,8 +44,8 @@ source = "vcs"
 [tool.hatch.build.hooks.vcs]
 version-file = "gterm/_version.py"
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
