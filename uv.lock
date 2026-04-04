@@ -92,7 +92,6 @@ wheels = [
 
 [[package]]
 name = "gterm"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },

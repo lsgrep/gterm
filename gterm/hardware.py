@@ -19,11 +19,7 @@ class HardwareSpec:
         elif self.has_metal:
             gpu_info = f", Metal GPU ({self.gpu_vram_gb:.0f}GB VRAM)"
 
-        return (
-            f"{self.ram_gb:.0f}GB RAM, "
-            f"{self.cpu_count} CPU cores"
-            f"{gpu_info}"
-        )
+        return f"{self.ram_gb:.0f}GB RAM, {self.cpu_count} CPU cores{gpu_info}"
 
 
 def detect_hardware() -> HardwareSpec:
@@ -47,12 +43,13 @@ def _get_ram_gb() -> float:
     if system == "Darwin":
         try:
             out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True)
-            return int(out.strip()) / (1024 ** 3)
+            return int(out.strip()) / (1024**3)
         except Exception:
             pass
     try:
         import psutil
-        return psutil.virtual_memory().total / (1024 ** 3)
+
+        return psutil.virtual_memory().total / (1024**3)
     except Exception:
         return 8.0  # safe fallback
 

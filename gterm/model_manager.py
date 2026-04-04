@@ -17,13 +17,14 @@ from gterm.hardware import HardwareSpec
 #   E2B    — MoE: ~5B total params, 2B active ("Effective 2B")
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class ModelVariant:
     name: str
     repo_id: str
     filename: str
-    size_gb: float       # actual file size from HuggingFace
-    min_ram_gb: float    # safe lower bound (size + ~30% overhead)
+    size_gb: float  # actual file size from HuggingFace
+    min_ram_gb: float  # safe lower bound (size + ~30% overhead)
     quant: str
 
 
@@ -45,44 +46,44 @@ _E2B = "bartowski/google_gemma-4-E2B-it-GGUF"
 
 MODEL_REGISTRY: list[ModelVariant] = [
     # ── 31B dense ────────────────────────────────────────────────────────────
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q8_0.gguf",    30.38, "Q8_0"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q6_K.gguf",    24.89, "Q6_K"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q5_K_M.gguf",  21.05, "Q5_K_M"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q4_K_M.gguf",  18.26, "Q4_K_M"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q3_K_M.gguf",  14.83, "Q3_K_M"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-IQ3_M.gguf",   14.09, "IQ3_M"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q2_K.gguf",    11.77, "Q2_K"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-IQ2_M.gguf",   11.78, "IQ2_M"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q8_0.gguf", 30.38, "Q8_0"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q6_K.gguf", 24.89, "Q6_K"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q5_K_M.gguf", 21.05, "Q5_K_M"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q4_K_M.gguf", 18.26, "Q4_K_M"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q3_K_M.gguf", 14.83, "Q3_K_M"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-IQ3_M.gguf", 14.09, "IQ3_M"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-Q2_K.gguf", 11.77, "Q2_K"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-IQ2_M.gguf", 11.78, "IQ2_M"),
     _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-IQ2_XXS.gguf", 10.09, "IQ2_XXS"),
-    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-IQ1_M.gguf",    9.41, "IQ1_M"),
+    _v("Gemma 4 31B", _31B, "google_gemma-4-31B-it-IQ1_M.gguf", 9.41, "IQ1_M"),
     # ── 26B-A4B MoE ──────────────────────────────────────────────────────────
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q8_0.gguf",    25.00, "Q8_0"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q6_K.gguf",    21.28, "Q6_K"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q5_K_M.gguf",  17.99, "Q5_K_M"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q4_K_M.gguf",  15.87, "Q4_K_M"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q3_K_M.gguf",  12.13, "Q3_K_M"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-IQ3_M.gguf",   12.37, "IQ3_M"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q2_K.gguf",    10.20, "Q2_K"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-IQ2_M.gguf",    9.97, "IQ2_M"),
-    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-IQ2_XXS.gguf",  8.99, "IQ2_XXS"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q8_0.gguf", 25.00, "Q8_0"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q6_K.gguf", 21.28, "Q6_K"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q5_K_M.gguf", 17.99, "Q5_K_M"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q4_K_M.gguf", 15.87, "Q4_K_M"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q3_K_M.gguf", 12.13, "Q3_K_M"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-IQ3_M.gguf", 12.37, "IQ3_M"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-Q2_K.gguf", 10.20, "Q2_K"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-IQ2_M.gguf", 9.97, "IQ2_M"),
+    _v("Gemma 4 26B-A4B", _26B, "google_gemma-4-26B-A4B-it-IQ2_XXS.gguf", 8.99, "IQ2_XXS"),
     # ── E4B MoE (~8B total, 4B active) ───────────────────────────────────────
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q8_0.gguf",    7.48, "Q8_0"),
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q6_K.gguf",    5.90, "Q6_K"),
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q5_K_M.gguf",  5.42, "Q5_K_M"),
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q4_K_M.gguf",  5.03, "Q4_K_M"),
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q3_K_M.gguf",  4.56, "Q3_K_M"),
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-IQ3_M.gguf",   4.44, "IQ3_M"),
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q2_K.gguf",    4.15, "Q2_K"),
-    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-IQ2_M.gguf",   3.69, "IQ2_M"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q8_0.gguf", 7.48, "Q8_0"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q6_K.gguf", 5.90, "Q6_K"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q5_K_M.gguf", 5.42, "Q5_K_M"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q4_K_M.gguf", 5.03, "Q4_K_M"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q3_K_M.gguf", 4.56, "Q3_K_M"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-IQ3_M.gguf", 4.44, "IQ3_M"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-Q2_K.gguf", 4.15, "Q2_K"),
+    _v("Gemma 4 E4B", _E4B, "google_gemma-4-E4B-it-IQ2_M.gguf", 3.69, "IQ2_M"),
     # ── E2B MoE (~5B total, 2B active) ───────────────────────────────────────
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q8_0.gguf",    4.63, "Q8_0"),
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q6_K.gguf",    3.63, "Q6_K"),
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q5_K_M.gguf",  3.41, "Q5_K_M"),
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q4_K_M.gguf",  3.23, "Q4_K_M"),
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q3_K_M.gguf",  3.00, "Q3_K_M"),
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-IQ3_M.gguf",   2.94, "IQ3_M"),
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q2_K.gguf",    2.81, "Q2_K"),
-    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-IQ2_M.gguf",   2.44, "IQ2_M"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q8_0.gguf", 4.63, "Q8_0"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q6_K.gguf", 3.63, "Q6_K"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q5_K_M.gguf", 3.41, "Q5_K_M"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q4_K_M.gguf", 3.23, "Q4_K_M"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q3_K_M.gguf", 3.00, "Q3_K_M"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-IQ3_M.gguf", 2.94, "IQ3_M"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-Q2_K.gguf", 2.81, "Q2_K"),
+    _v("Gemma 4 E2B", _E2B, "google_gemma-4-E2B-it-IQ2_M.gguf", 2.44, "IQ2_M"),
 ]
 
 
@@ -118,7 +119,7 @@ def download_model(variant: ModelVariant, hf_token: str | None = None) -> Path:
     if dest_path.exists():
         return dest_path
 
-    total_bytes = int(variant.size_gb * 1024 ** 3)
+    total_bytes = int(variant.size_gb * 1024**3)
     label = f"Downloading {variant.name} ({variant.quant})"
 
     result: dict = {}
