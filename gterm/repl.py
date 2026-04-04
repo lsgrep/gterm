@@ -9,6 +9,8 @@ from gterm.executor import (
     extract_commands,
     is_answer_response,
     is_clarify_response,
+    looks_like_direct_command,
+    run_direct_commands,
 )
 from gterm.hardware import HardwareSpec
 from gterm.history import ConversationHistory
@@ -75,6 +77,9 @@ class GtermREPL:
         if builtin_result is not None:
             return builtin_result
 
+        if looks_like_direct_command(user_input, self._cwd):
+            return self._run_direct_command(user_input)
+
         self._history.add_user(user_input)
         llm_response = self._query_llm()
 
@@ -120,6 +125,26 @@ class GtermREPL:
         elif was_run and exit_code == 0 and output:
             self._auto_followup(output)
 
+        return True
+
+    def _run_direct_command(self, user_input: str) -> bool:
+        self._ui.show_info("running direct command")
+        self._history.add_user(user_input)
+        was_run, output, new_cwd, exit_code = run_direct_commands(
+            [user_input], self._shell, self._ui, self._cwd
+        )
+        self._cwd = new_cwd
+
+        context = f"Ran directly: `{user_input}`\n"
+        if was_run and output:
+            context += f"Output:\n{output[:OUTPUT_CONTEXT_LIMIT]}"
+            if len(output) > OUTPUT_CONTEXT_LIMIT:
+                context += "\n[output truncated]"
+        elif was_run:
+            context += f"Exit code: {exit_code}"
+        else:
+            context += "Execution did not run."
+        self._history.set_last_assistant(context)
         return True
 
     def _auto_followup(self, output: str) -> None:

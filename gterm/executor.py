@@ -1,6 +1,7 @@
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
@@ -47,6 +48,73 @@ _DANGER_PATTERNS = [
     re.compile(r"\bformat\b.*\b/dev/"),
     re.compile(r"\bsudo\s+rm\s+-rf\s+[/~]"),
 ]
+_DIRECT_COMMANDS = {
+    "bash",
+    "brew",
+    "bun",
+    "cargo",
+    "cat",
+    "cd",
+    "chmod",
+    "chown",
+    "claude",
+    "clear",
+    "codex",
+    "cp",
+    "curl",
+    "df",
+    "diff",
+    "docker",
+    "du",
+    "echo",
+    "env",
+    "fd",
+    "find",
+    "gemini",
+    "git",
+    "go",
+    "grep",
+    "head",
+    "kubectl",
+    "less",
+    "ln",
+    "ls",
+    "make",
+    "mkdir",
+    "mv",
+    "nano",
+    "npx",
+    "nvim",
+    "pip",
+    "pip3",
+    "pnpm",
+    "podman",
+    "ps",
+    "pwd",
+    "py.test",
+    "pytest",
+    "python",
+    "python3",
+    "rg",
+    "rm",
+    "ruff",
+    "scp",
+    "sed",
+    "sh",
+    "ssh",
+    "tail",
+    "tar",
+    "touch",
+    "tree",
+    "uv",
+    "vi",
+    "vim",
+    "wget",
+    "which",
+    "yarn",
+    "zsh",
+}
+_ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
 
 
 @dataclass(frozen=True)
@@ -101,6 +169,36 @@ def is_dangerous(commands: list[str]) -> bool:
     return any(p.search(joined) for p in _DANGER_PATTERNS)
 
 
+def looks_like_direct_command(text: str, cwd: Path) -> bool:
+    stripped = text.strip()
+    if not stripped:
+        return False
+    if stripped.endswith("?"):
+        return False
+
+    words = _split_shell_words(stripped)
+    if not words:
+        return False
+
+    command_index = 0
+    while command_index < len(words) and _ENV_ASSIGNMENT_RE.match(words[command_index]):
+        command_index += 1
+    if command_index >= len(words):
+        return False
+
+    command = words[command_index]
+    if _has_shell_syntax(stripped):
+        return _looks_runnable(command, cwd)
+
+    if command in _DIRECT_COMMANDS:
+        return True
+
+    if command.startswith(("./", "../", "/", "~/")):
+        return _path_like_command_exists(command, cwd)
+
+    return len(words[command_index:]) == 1 and shutil.which(command) is not None
+
+
 def confirm_and_run(
     commands: list[str],
     shell: ShellAdapter,
@@ -131,6 +229,15 @@ def confirm_and_run(
             commands = _edit_commands(commands)
         else:
             ui.show_error("Please enter y, n, or e.")
+
+
+def run_direct_commands(
+    commands: list[str],
+    shell: ShellAdapter,
+    ui: UIRenderer,
+    cwd: Path,
+) -> tuple[bool, str, Path, int]:
+    return _execute(commands, shell, ui, cwd)
 
 
 def _execute(
@@ -250,6 +357,28 @@ def _split_shell_words(command: str) -> list[str]:
         return shlex.split(command)
     except ValueError:
         return command.strip().split()
+
+
+def _has_shell_syntax(text: str) -> bool:
+    markers = ("|", ">", "<", ";", "&&", "||", "$(", "`")
+    return any(marker in text for marker in markers)
+
+
+def _looks_runnable(command: str, cwd: Path) -> bool:
+    if command in _DIRECT_COMMANDS:
+        return True
+    if command in {".", "source"}:
+        return True
+    if command.startswith(("./", "../", "/", "~/")):
+        return _path_like_command_exists(command, cwd)
+    return shutil.which(command) is not None
+
+
+def _path_like_command_exists(command: str, cwd: Path) -> bool:
+    expanded = Path(command).expanduser()
+    if not expanded.is_absolute():
+        expanded = (cwd / expanded).resolve()
+    return expanded.exists()
 
 
 def _is_network_command(words: list[str]) -> bool:
