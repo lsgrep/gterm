@@ -1,0 +1,55 @@
+[project]
+name = "gterm"
+dynamic = ["version"]
+description = "Natural language terminal powered by Gemma 4 via llama.cpp"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+keywords = ["llm", "terminal", "gemma", "cli", "llama-cpp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "llama-cpp-python>=0.3.20",
+    "rich>=13.7",
+    "click>=8.1",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.6",
+    "huggingface-hub>=0.23",
+    "psutil>=5.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/lsgrep/gterm"
+Issues   = "https://github.com/lsgrep/gterm/issues"
+
+[project.scripts]
+gterm = "gterm.cli:main"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "gterm/_version.py"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
