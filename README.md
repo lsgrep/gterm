@@ -11,6 +11,7 @@ Describe what you want in plain English. `gterm` turns that into shell commands,
 - Learns your projects and common directories from shell history, with explicit consent
 - Suggests a corrected command automatically when a command fails
 - Gives a short follow-up summary after non-trivial command output
+- Auto-runs safe read-only inspection commands after preview
 - Hands off full-terminal tools like `codex`, `aider`, `vim`, and `lazygit` without breaking their UI
 
 ## Install
@@ -84,7 +85,7 @@ The prompt shows:
 
 For each request, the model responds in exactly one mode:
 
-- Shell command: a fenced shell block that `gterm` previews, then either auto-runs if it is read-only or asks for confirmation if it changes state
+- Shell command: a fenced shell block that `gterm` previews, then either auto-runs if it is non-stateful or asks for confirmation if it changes state
 - `# ANSWER:`: a direct answer when you ask to explain or summarize output
 - `# CLARIFY:`: only when the request is genuinely ambiguous or destructive
 
@@ -94,7 +95,10 @@ Before state-changing execution, you get:
   [y]es  [n]o  [e]dit
 ```
 
-`e` opens the generated command in `$EDITOR` so you can modify it before running. Read-only inspection commands such as `ls`, `cat`, `git status`, and similar safe pipelines run immediately after the preview panel.
+`e` opens the generated command in `$EDITOR` so you can modify it before running. Safe non-stateful commands run immediately after the preview panel, including:
+
+- read-only inspection commands such as `ls`, `cat`, `git status`, and snapshot pipelines like `top -l 1 -s 0 | grep -E 'PhysMem|Swap'`
+- pure interactive handoffs such as `cd /path/to/project` followed by `codex`
 
 After execution:
 
@@ -137,7 +141,7 @@ Nothing is uploaded anywhere. The derived context is stored locally in `~/.confi
 
 ## Interactive tools
 
-`gterm` can launch full-terminal programs directly instead of trying to capture their output. That includes:
+`gterm` can launch full-terminal programs directly instead of trying to capture their output. Pure handoffs to these tools do not require confirmation unless the generated command also changes state in some other way. That includes:
 
 - `claude`
 - `aider`
