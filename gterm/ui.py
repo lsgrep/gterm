@@ -82,7 +82,9 @@ class UIRenderer:
             )
         )
 
-    def show_command_panel(self, commands: list[str], preview: "CommandPreview | None" = None) -> None:
+    def show_command_panel(
+        self, commands: list[str], preview: "CommandPreview | None" = None
+    ) -> None:
         code = "\n".join(commands)
         syntax = Syntax(code, "bash", theme="monokai", word_wrap=True)
         console.print(Panel(syntax, title="[yellow]proposed command[/]", border_style="yellow"))

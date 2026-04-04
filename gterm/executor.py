@@ -275,45 +275,55 @@ def _is_file_mutation_command(words: list[str], command: str) -> bool:
         return True
     if head == "sed" and any(part.startswith("-i") for part in words[1:]):
         return True
-    if head in {"git"} and len(words) > 1 and words[1] in {
-        "apply",
-        "am",
-        "checkout",
-        "cherry-pick",
-        "clean",
-        "merge",
-        "mv",
-        "restore",
-        "revert",
-        "rm",
-        "switch",
-    }:
+    if (
+        head in {"git"}
+        and len(words) > 1
+        and words[1]
+        in {
+            "apply",
+            "am",
+            "checkout",
+            "cherry-pick",
+            "clean",
+            "merge",
+            "mv",
+            "restore",
+            "revert",
+            "rm",
+            "switch",
+        }
+    ):
         return True
     return False
 
 
 def _is_git_mutation_command(words: list[str]) -> bool:
-    return words[0] == "git" and len(words) > 1 and words[1] in {
-        "add",
-        "am",
-        "apply",
-        "checkout",
-        "cherry-pick",
-        "clean",
-        "commit",
-        "merge",
-        "mv",
-        "pull",
-        "push",
-        "rebase",
-        "reset",
-        "restore",
-        "revert",
-        "rm",
-        "stash",
-        "switch",
-        "tag",
-    }
+    return (
+        words[0] == "git"
+        and len(words) > 1
+        and words[1]
+        in {
+            "add",
+            "am",
+            "apply",
+            "checkout",
+            "cherry-pick",
+            "clean",
+            "commit",
+            "merge",
+            "mv",
+            "pull",
+            "push",
+            "rebase",
+            "reset",
+            "restore",
+            "revert",
+            "rm",
+            "stash",
+            "switch",
+            "tag",
+        }
+    )
 
 
 def _is_package_change_command(words: list[str]) -> bool:
@@ -329,20 +339,30 @@ def _is_package_change_command(words: list[str]) -> bool:
         and words[2] in {"install", "uninstall"}
     ):
         return True
-    if head in {"npm", "pnpm", "yarn"} and len(words) > 1 and words[1] in {
-        "add",
-        "install",
-        "remove",
-        "uninstall",
-        "update",
-    }:
+    if (
+        head in {"npm", "pnpm", "yarn"}
+        and len(words) > 1
+        and words[1]
+        in {
+            "add",
+            "install",
+            "remove",
+            "uninstall",
+            "update",
+        }
+    ):
         return True
-    if head in {"brew", "apt", "apt-get"} and len(words) > 1 and words[1] in {
-        "install",
-        "remove",
-        "uninstall",
-        "upgrade",
-    }:
+    if (
+        head in {"brew", "apt", "apt-get"}
+        and len(words) > 1
+        and words[1]
+        in {
+            "install",
+            "remove",
+            "uninstall",
+            "upgrade",
+        }
+    ):
         return True
     if head == "cargo" and len(words) > 1 and words[1] in {"add", "remove", "install"}:
         return True
@@ -357,25 +377,40 @@ def _is_delete_command(words: list[str]) -> bool:
         return True
     if head == "git" and len(words) > 1 and words[1] in {"clean", "rm"}:
         return True
-    if head in {"docker", "podman"} and len(words) > 1 and words[1] in {
-        "prune",
-        "rm",
-        "rmi",
-    }:
+    if (
+        head in {"docker", "podman"}
+        and len(words) > 1
+        and words[1]
+        in {
+            "prune",
+            "rm",
+            "rmi",
+        }
+    ):
         return True
     if head == "kubectl" and len(words) > 1 and words[1] == "delete":
         return True
-    if head in {"brew", "apt", "apt-get"} and len(words) > 1 and words[1] in {
-        "remove",
-        "uninstall",
-    }:
+    if (
+        head in {"brew", "apt", "apt-get"}
+        and len(words) > 1
+        and words[1]
+        in {
+            "remove",
+            "uninstall",
+        }
+    ):
         return True
     if head in {"pip", "pip3"} and len(words) > 1 and words[1] == "uninstall":
         return True
-    if head in {"npm", "pnpm", "yarn"} and len(words) > 1 and words[1] in {
-        "remove",
-        "uninstall",
-    }:
+    if (
+        head in {"npm", "pnpm", "yarn"}
+        and len(words) > 1
+        and words[1]
+        in {
+            "remove",
+            "uninstall",
+        }
+    ):
         return True
     return False
 
