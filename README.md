@@ -84,17 +84,17 @@ The prompt shows:
 
 For each request, the model responds in exactly one mode:
 
-- Shell command: a fenced shell block that `gterm` asks you to confirm
+- Shell command: a fenced shell block that `gterm` previews, then either auto-runs if it is read-only or asks for confirmation if it changes state
 - `# ANSWER:`: a direct answer when you ask to explain or summarize output
 - `# CLARIFY:`: only when the request is genuinely ambiguous or destructive
 
-Before execution, you get:
+Before state-changing execution, you get:
 
 ```text
   [y]es  [n]o  [e]dit
 ```
 
-`e` opens the generated command in `$EDITOR` so you can modify it before running.
+`e` opens the generated command in `$EDITOR` so you can modify it before running. Read-only inspection commands such as `ls`, `cat`, `git status`, and similar safe pipelines run immediately after the preview panel.
 
 After execution:
 

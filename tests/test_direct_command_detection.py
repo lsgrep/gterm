@@ -7,6 +7,7 @@ def test_looks_like_direct_command_accepts_common_shell_inputs(tmp_path: Path) -
     script = tmp_path / "script.sh"
     script.write_text("#!/bin/sh\necho hi\n")
 
+    assert looks_like_direct_command("top", Path.cwd())
     assert looks_like_direct_command("git status", Path.cwd())
     assert looks_like_direct_command("make run", Path.cwd())
     assert looks_like_direct_command("uv run pytest -q", Path.cwd())

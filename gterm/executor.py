@@ -35,6 +35,7 @@ _TTY_COMMANDS = {
     "less",
     "more",
     "man",
+    "top",
     "htop",
     "btop",
     "lazygit",
@@ -105,6 +106,7 @@ _DIRECT_COMMANDS = {
     "tail",
     "tar",
     "touch",
+    "top",
     "tree",
     "uv",
     "vi",
@@ -115,12 +117,55 @@ _DIRECT_COMMANDS = {
     "zsh",
 }
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
+_READ_ONLY_COMMANDS = {
+    "awk",
+    "cat",
+    "column",
+    "cut",
+    "date",
+    "df",
+    "diff",
+    "du",
+    "echo",
+    "env",
+    "fd",
+    "file",
+    "find",
+    "grep",
+    "head",
+    "ifconfig",
+    "lsof",
+    "ls",
+    "memory_pressure",
+    "netstat",
+    "pgrep",
+    "printenv",
+    "ps",
+    "pwd",
+    "rg",
+    "sed",
+    "sort",
+    "stat",
+    "tail",
+    "top",
+    "tree",
+    "uname",
+    "uniq",
+    "vm_stat",
+    "wc",
+    "which",
+}
+_READ_ONLY_GIT_SUBCOMMANDS = {"diff", "grep", "log", "ls-files", "rev-parse", "show", "status"}
+_READ_ONLY_DOCKER_SUBCOMMANDS = {"images", "info", "inspect", "logs", "ps", "stats", "version"}
+_READ_ONLY_KUBECTL_SUBCOMMANDS = {"describe", "get", "logs", "version"}
+_READ_ONLY_BREW_SUBCOMMANDS = {"info", "list", "search"}
 
 
 @dataclass(frozen=True)
 class CommandPreview:
     info: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    permission_required: bool = True
 
 
 def is_clarify_response(llm_output: str) -> tuple[bool, str]:
@@ -151,8 +196,7 @@ def extract_commands(llm_output: str) -> list[str] | None:
 def needs_tty(commands: list[str]) -> bool:
     """Return True if any command in the list needs a full TTY (no output capture)."""
     for cmd in commands:
-        first_word = cmd.strip().split()[0].lstrip("./") if cmd.strip() else ""
-        if first_word in _TTY_COMMANDS:
+        if _command_needs_tty(cmd):
             return True
     return False
 
@@ -206,8 +250,14 @@ def confirm_and_run(
     cwd: Path,
     paranoid_mode: bool = False,
 ) -> tuple[bool, str, Path, int]:
+    preview = analyze_commands(commands, cwd)
+
     while True:
-        ui.show_command_panel(commands, analyze_commands(commands, cwd))
+        ui.show_command_panel(commands, preview)
+
+        if not preview.permission_required:
+            ui.show_info("auto-running read-only command")
+            return _execute(commands, shell, ui, cwd)
 
         if paranoid_mode and is_dangerous(commands):
             ui.show_error(
@@ -337,7 +387,18 @@ def analyze_commands(commands: list[str], cwd: Path) -> CommandPreview:
     if is_dangerous(commands):
         warnings.append("matches a dangerous command pattern")
 
-    return CommandPreview(info=info, warnings=warnings)
+    permission_required = _requires_confirmation(commands, cwd)
+    if not permission_required:
+        if needs_tty(commands):
+            info.append("non-stateful interactive handoff; will launch without confirmation")
+        else:
+            info.append("read-only inspection; will run without confirmation")
+
+    return CommandPreview(
+        info=info,
+        warnings=warnings,
+        permission_required=permission_required,
+    )
 
 
 def _split_leading_cd_commands(commands: list[str], cwd: Path) -> tuple[Path, list[str]]:
@@ -362,6 +423,195 @@ def _split_shell_words(command: str) -> list[str]:
 def _has_shell_syntax(text: str) -> bool:
     markers = ("|", ">", "<", ";", "&&", "||", "$(", "`")
     return any(marker in text for marker in markers)
+
+
+def _requires_confirmation(commands: list[str], cwd: Path) -> bool:
+    effective_cwd, remaining = _split_leading_cd_commands(commands, cwd)
+    if not remaining:
+        return False
+    return not all(_is_safe_non_stateful_command(command, effective_cwd) for command in remaining)
+
+
+def _is_safe_non_stateful_command(command: str, cwd: Path) -> bool:
+    return _is_safe_read_only_command(command, cwd) or _is_safe_handoff_command(command, cwd)
+
+
+def _is_safe_read_only_command(command: str, cwd: Path) -> bool:
+    stripped = command.strip()
+    if not stripped:
+        return True
+
+    if any(marker in stripped for marker in (";", "&&", "||", "$(", "`", "&")):
+        return False
+
+    if "|" in stripped:
+        segments = _split_pipeline_segments(stripped)
+        if not segments:
+            return False
+        return all(_is_safe_read_only_segment(segment, cwd) for segment in segments)
+
+    return _is_safe_read_only_segment(stripped, cwd)
+
+
+def _is_safe_handoff_command(command: str, cwd: Path) -> bool:
+    stripped = command.strip()
+    if not stripped:
+        return True
+
+    if any(marker in stripped for marker in ("|", ";", "&&", "||", ">", "<", "$(", "`", "&")):
+        return False
+
+    words = _split_shell_words(stripped)
+    if not words:
+        return False
+
+    command_index = 0
+    while command_index < len(words) and _ENV_ASSIGNMENT_RE.match(words[command_index]):
+        command_index += 1
+    if command_index >= len(words):
+        return False
+
+    head = words[command_index]
+    if head in {"sudo", "doas", "ssh", "scp", "sftp", "rsync"}:
+        return False
+
+    return _command_needs_tty(stripped)
+
+
+def _is_safe_read_only_segment(command: str, cwd: Path) -> bool:
+    stripped = command.strip()
+    if not stripped or re.search(r"(^|[^>])>>?\s*\S+", stripped):
+        return False
+    if "<" in stripped:
+        return False
+
+    words = _split_shell_words(stripped)
+    if not words:
+        return False
+
+    command_index = 0
+    while command_index < len(words) and _ENV_ASSIGNMENT_RE.match(words[command_index]):
+        command_index += 1
+    if command_index >= len(words):
+        return False
+
+    head = words[command_index]
+    args = words[command_index + 1 :]
+
+    if head in {"sudo", "doas", "ssh", "scp", "sftp", "rsync"}:
+        return False
+    if head.startswith(("./", "../", "/", "~/")) and _path_like_command_exists(head, cwd):
+        return False
+    if head in _READ_ONLY_COMMANDS:
+        return not _command_has_mutating_flags(head, args)
+    if head == "git" and args:
+        return args[0] in _READ_ONLY_GIT_SUBCOMMANDS
+    if head in {"docker", "podman"} and args:
+        return args[0] in _READ_ONLY_DOCKER_SUBCOMMANDS
+    if head == "kubectl" and args:
+        return args[0] in _READ_ONLY_KUBECTL_SUBCOMMANDS
+    if head == "brew" and args:
+        return args[0] in _READ_ONLY_BREW_SUBCOMMANDS
+    if head == "curl":
+        return _is_safe_http_read(args)
+
+    return False
+
+
+def _command_has_mutating_flags(head: str, args: list[str]) -> bool:
+    if head == "sed":
+        return any(arg.startswith("-i") for arg in args)
+    if head in {"find", "fd"}:
+        return any(arg in {"-delete", "-exec", "--exec"} for arg in args)
+    return False
+
+
+def _command_needs_tty(command: str) -> bool:
+    words = _split_shell_words(command)
+    if not words:
+        return False
+
+    command_index = 0
+    while command_index < len(words) and _ENV_ASSIGNMENT_RE.match(words[command_index]):
+        command_index += 1
+    if command_index >= len(words):
+        return False
+
+    head = words[command_index].lstrip("./")
+    args = words[command_index + 1 :]
+
+    if head == "top" and _top_is_noninteractive(args):
+        return False
+
+    return head in _TTY_COMMANDS
+
+
+def _top_is_noninteractive(args: list[str]) -> bool:
+    for arg in args:
+        if arg in {"-b", "-l"}:
+            return True
+        if arg.startswith("-b") and arg != "-":
+            return True
+        if arg.startswith("-l") and arg != "-":
+            return True
+    return False
+
+
+def _is_safe_http_read(args: list[str]) -> bool:
+    method = "GET"
+    for index, arg in enumerate(args):
+        if arg in {"-X", "--request"}:
+            if index + 1 >= len(args):
+                return False
+            method = args[index + 1].upper()
+        elif arg.startswith("--request="):
+            method = arg.split("=", 1)[1].upper()
+        elif arg.startswith("-X") and len(arg) > 2:
+            method = arg[2:].upper()
+
+        if arg in {
+            "-d",
+            "--data",
+            "--data-raw",
+            "--data-binary",
+            "--form",
+            "-F",
+            "--upload-file",
+            "-T",
+            "-o",
+            "--output",
+            "-O",
+            "--remote-name",
+        }:
+            return False
+        if arg.startswith(
+            ("--data=", "--data-raw=", "--data-binary=", "--form=", "--output=")
+        ):
+            return False
+
+    return method in {"GET", "HEAD"}
+
+
+def _split_pipeline_segments(command: str) -> list[str]:
+    words = _split_shell_words(command)
+    if not words:
+        return []
+
+    segments: list[str] = []
+    current: list[str] = []
+    for word in words:
+        if word == "|":
+            if not current:
+                return []
+            segments.append(shlex.join(current))
+            current = []
+            continue
+        current.append(word)
+
+    if not current:
+        return []
+    segments.append(shlex.join(current))
+    return segments
 
 
 def _looks_runnable(command: str, cwd: Path) -> bool:
