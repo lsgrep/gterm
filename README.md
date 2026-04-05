@@ -2,6 +2,8 @@
 
 Local natural-language terminal powered by Gemma 4 via `llama.cpp`.
 
+![gterm demo](demo.gif)
+
 Describe what you want in plain English. `gterm` turns that into shell commands, shows the exact command before execution, and keeps enough context to help with follow-up requests.
 
 ## What it does
